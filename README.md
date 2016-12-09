@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/softplan/jsversioning-maven-plugin.svg?branch=wip)](https://travis-ci.org/softplan/jsversioning-maven-plugin)
+
 #JAVASCRIPT VERSIONING
 
 You have something like this defined in your webapps files:
