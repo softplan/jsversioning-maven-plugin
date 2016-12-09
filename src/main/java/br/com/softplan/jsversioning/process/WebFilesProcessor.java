@@ -35,98 +35,86 @@ import org.apache.maven.plugin.logging.Log;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Collection;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 
 
 public class WebFilesProcessor {
 
-    private Path webFilesDirectory;
+    private File webFilesDirectory;
     private File webAppOutputDirectory;
     private Log log;
 
     public WebFilesProcessor(File webFilesDirectory, File webAppOutputDirectory, Log log) {
-        this.webFilesDirectory = webFilesDirectory.toPath();
+        this.webFilesDirectory = webFilesDirectory;
         this.webAppOutputDirectory = webAppOutputDirectory;
         this.log = log;
     }
 
-    public void process(Stream<String> webFilesPaths) throws IOException {
-        ScriptTagProcessor scriptTagProcessor = new ScriptTagProcessor();
-        webFilesPaths.forEach(scriptTagProcessor::processScriptTags);
+    public void process() {
+        Path start = this.webFilesDirectory.toPath();
+        this.log.debug("Start to walk the file tree of path on " + start.toString() );
+        try {
+            Files.walkFileTree(start, new WebFilesVisitor());
+        } catch (Exception e) {
+            throw new IllegalStateException("Error processing files: ", e);
+        }
     }
 
     private class ScriptTagProcessor {
 
         private Pattern pattern = Pattern.compile("src=(\\\".+\\.js)");
+        private Map<String, String> jsVersionCache = new ConcurrentHashMap<>();
 
-        public void processScriptTags(String webFileRelativePath) {
-            try {
-                String probablyHtmlFileText = FileUtils.readFileToString(Files.createFile(webFilesDirectory.
-                (Paths.get(webFileRelativePath))),Charset.defaultCharset());
-                Matcher matcher = this.pattern.matcher(probablyHtmlFileText);
-                int changes = 0;
-                String file;
-                for (JsFile jsFile = new JsFile(); matcher.find(); probablyHtmlFileText = org.codehaus.plexus.interpolation.util.StringUtils.replace(probablyHtmlFileText, file, file + "?n=" + jsFile.getVersion() + "")) {
-                    ++changes;
-                    file = matcher.group(1);
-                    jsFile.findSrcContent(file);
+        public String process(final Path filePath) throws IOException {
+
+            String content = FileUtils.readFileToString(filePath.toFile(), Charset.defaultCharset());
+            Matcher matcher = this.pattern.matcher(content);
+            String newContent = content;
+            while (matcher.find()) {
+                String fileName = matcher.group(1);
+
+                String version = this.jsVersionCache.get(fileName);
+                if (StringUtils.isBlank(version)) {
+                    version = new JsFile(fileName).getVersion();
+                    this.jsVersionCache.put(fileName, version);
                 }
-                if (changes != 0) {
-                    File var7 = new File(WebFilesProcessor.this.webAppOutputDirectory, webFileRelativePath);
-                    FileUtils.writeStringToFile(var7, probablyHtmlFileText, "UTF-8");
-                }
-            } catch (IOException e) {
-                throw new IllegalStateException(e);
+
+                newContent = StringUtils.replace(newContent, fileName, fileName + "?n=" + version + "");
             }
+
+            return newContent;
         }
 
         private class JsFile {
 
-            private String subFolder;
             private String fileName;
-            private String separator = "/";
-            private Map<String, String> jsHashCode = new ConcurrentHashMap();
 
-            JsFile() {
-            }
-
-            void findSrcContent(String srcContent) {
-                String[] filePath = StringUtils.split(srcContent, this.separator);
-                if (filePath.length > 1) {
-                    this.subFolder = filePath[filePath.length - 2];
-                }
-                this.fileName = filePath[filePath.length - 1];
+            JsFile(String fileNamePath) {
+                this.fileName = fileNamePath;
             }
 
             String getVersion() {
-                String key = this.subFolder + this.fileName;
-                if (!this.jsHashCode.containsKey(key)) {
-                    IOFileFilter nameFileFilter = FileFilterUtils.nameFileFilter(this.fileName);
-                    Collection files = FileUtils.listFiles(WebFilesProcessor.this.webFilesDirectory, nameFileFilter, TrueFileFilter.INSTANCE);
-                    String version = this.getVersion(files, this.fileName);
-                    this.jsHashCode.put(key, version);
-                }
-                return this.jsHashCode.get(key);
+                IOFileFilter nameFileFilter = FileFilterUtils.nameFileFilter(this.fileName);
+                Collection files = FileUtils.listFiles(WebFilesProcessor.this.webFilesDirectory, nameFileFilter, TrueFileFilter.INSTANCE);
+                return this.getVersion(files, this.fileName);
             }
 
             private String getVersion(Collection<File> files, String fileName) {
                 if (files.isEmpty()) {
-                    return this.getRandomVersion(fileName);
+                    return getRandomVersion(fileName);
                 } else {
                     File file = files.iterator().next();
                     try {
-                        String e = String.valueOf(FileUtils.checksumCRC32(file));
-                        WebFilesProcessor.this.log.info("JS : " + file.toString() + ", CHECKSUM: " + e);
-                        return e;
+                        String checksum = String.valueOf(FileUtils.checksumCRC32(file));
+                        WebFilesProcessor.this.log.info("JS : " + file.toString() + ", CHECKSUM: " + checksum);
+                        return checksum;
                     } catch (IOException var5) {
                         return this.getRandomVersion(fileName);
                     }
@@ -144,7 +132,6 @@ public class WebFilesProcessor {
                 if (obj instanceof EqualsBuilder) {
                     JsFile jsFile = (JsFile) obj;
                     EqualsBuilder equals = new EqualsBuilder();
-                    equals.append(jsFile.subFolder, this.subFolder);
                     equals.append(jsFile.fileName, this.fileName);
                     return equals.isEquals();
                 }
@@ -154,12 +141,23 @@ public class WebFilesProcessor {
             @Override
             public int hashCode() {
                 HashCodeBuilder hash = new HashCodeBuilder();
-                hash.append(this.subFolder);
                 hash.append(this.fileName);
                 return hash.toHashCode();
             }
 
         }
+    }
+
+    private class WebFilesVisitor extends SimpleFileVisitor<Path> {
+
+        private ScriptTagProcessor scriptTagProcessor = new ScriptTagProcessor();
+
+        @Override
+        public FileVisitResult visitFile(Path filePath, BasicFileAttributes attrs) throws IOException {
+            this.scriptTagProcessor.process(filePath);
+            return FileVisitResult.CONTINUE;
+        }
+
     }
 
 }

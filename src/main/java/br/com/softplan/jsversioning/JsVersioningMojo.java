@@ -61,9 +61,7 @@ public class JsVersioningMojo extends AbstractMojo {
         if (this.skipJsVersioning()) {
             getLog().info("Js versioning skipped");
         } else {
-            Stream<String> webFilesStream = getWebFiles();
-            WebFilesProcessor webFilesProcessor = new WebFilesProcessor(this.webFilesDirectory, this.webappOutputDirectory, getLog());
-            processFiles(webFilesStream, webFilesProcessor);
+            new WebFilesProcessor(this.webFilesDirectory, this.webappOutputDirectory, getLog()).process();
         }
     }
 
@@ -78,29 +76,6 @@ public class JsVersioningMojo extends AbstractMojo {
         Properties properties = this.mavenProject.getProperties();
         Object object = properties.get("maven.skip.jsversioning");
         return object != null ? Boolean.TRUE.equals(object) : false;
-    }
-
-    private void processFiles(Stream<String> webFiles, WebFilesProcessor processWebFiles) {
-        try {
-            processWebFiles.process(webFiles);
-        } catch (IOException e) {
-            throw new IllegalStateException(e);
-        }
-    }
-
-    /**
-     * @return If the specified web directory does not exists, returns an empty array
-     * Else returns a list of all files in the directory
-     */
-    private Stream<String> getWebFiles() {
-        if (!this.webFilesDirectory.exists()) {
-            return Stream.empty();
-        } else {
-            DirectoryScanner ds = new DirectoryScanner();
-            ds.setBasedir(this.webFilesDirectory);
-            ds.scan();
-            return Stream.of(ds.getIncludedFiles());
-        }
     }
 
 }
