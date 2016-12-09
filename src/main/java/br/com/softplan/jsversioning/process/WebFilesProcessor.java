@@ -35,7 +35,10 @@ import org.apache.maven.plugin.logging.Log;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
-import java.nio.file.*;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Collection;
 import java.util.Map;
@@ -59,7 +62,7 @@ public class WebFilesProcessor {
 
     public void process() {
         Path start = this.webFilesDirectory.toPath();
-        this.log.debug("Start to walk the file tree of path on " + start.toString() );
+        this.log.debug("Start to walk the file tree of path on " + start.toString());
         try {
             Files.walkFileTree(start, new WebFilesVisitor());
         } catch (Exception e) {
@@ -148,13 +151,19 @@ public class WebFilesProcessor {
         }
     }
 
+    private class WebFileWriter {
+
+        
+    }
+
     private class WebFilesVisitor extends SimpleFileVisitor<Path> {
 
         private ScriptTagProcessor scriptTagProcessor = new ScriptTagProcessor();
 
         @Override
         public FileVisitResult visitFile(Path filePath, BasicFileAttributes attrs) throws IOException {
-            this.scriptTagProcessor.process(filePath);
+            String content = this.scriptTagProcessor.process(filePath);
+
             return FileVisitResult.CONTINUE;
         }
 
