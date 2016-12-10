@@ -41,7 +41,7 @@ import java.util.stream.Stream;
 @Mojo(name = "versioning", defaultPhase = LifecyclePhase.PROCESS_RESOURCES)
 public class JsVersioningMojo extends AbstractMojo {
 
-    @Parameter(defaultValue = "${basedir}/src/webapp", required = true)
+    @Parameter(defaultValue = "${basedir}/src/main/webapp", required = true)
     private File webFilesDirectory;
 
     @Parameter(defaultValue = "${project.build.directory}/temp", required = true)
@@ -75,7 +75,7 @@ public class JsVersioningMojo extends AbstractMojo {
     private boolean getSkipProperty() {
         Properties properties = this.mavenProject.getProperties();
         Object object = properties.get("maven.skip.jsversioning");
-        return object != null ? Boolean.TRUE.equals(object) : false;
+        return object != null && Boolean.TRUE.equals(object);
     }
 
 }

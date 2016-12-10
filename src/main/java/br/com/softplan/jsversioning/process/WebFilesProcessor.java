@@ -24,12 +24,7 @@
 package br.com.softplan.jsversioning.process;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.filefilter.FileFilterUtils;
-import org.apache.commons.io.filefilter.IOFileFilter;
-import org.apache.commons.io.filefilter.TrueFileFilter;
 import org.apache.commons.lang.StringUtils;
-import org.apache.commons.lang.builder.EqualsBuilder;
-import org.apache.commons.lang.builder.HashCodeBuilder;
 import org.apache.maven.plugin.logging.Log;
 
 import java.io.File;
@@ -40,8 +35,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.Collection;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
@@ -50,21 +45,20 @@ import java.util.regex.Pattern;
 
 public class WebFilesProcessor {
 
-    private File webFilesDirectory;
-    private File webAppOutputDirectory;
+    private Path webFilesDirectory;
+    private Path webAppOutputDirectory;
     private Log log;
 
     public WebFilesProcessor(File webFilesDirectory, File webAppOutputDirectory, Log log) {
-        this.webFilesDirectory = webFilesDirectory;
-        this.webAppOutputDirectory = webAppOutputDirectory;
+        this.webFilesDirectory = webFilesDirectory.toPath();
+        this.webAppOutputDirectory = webAppOutputDirectory.toPath();
         this.log = log;
     }
 
     public void process() {
-        Path start = this.webFilesDirectory.toPath();
-        this.log.debug("Start to walk the file tree of path on " + start.toString());
+        this.log.debug("Start to walk the file tree of path on " + this.webFilesDirectory);
         try {
-            Files.walkFileTree(start, new WebFilesVisitor());
+            Files.walkFileTree(this.webFilesDirectory, new WebFilesVisitor());
         } catch (Exception e) {
             throw new IllegalStateException("Error processing files: ", e);
         }
@@ -72,15 +66,17 @@ public class WebFilesProcessor {
 
     private class ScriptTagProcessor {
 
-        private Pattern pattern = Pattern.compile("src=(\\\".+\\.js)");
+        private Pattern pattern = Pattern.compile("src=\"(.+\\.js)");
         private Map<String, String> jsVersionCache = new ConcurrentHashMap<>();
 
-        public String process(final Path filePath) throws IOException {
+        public Optional<String> process(final Path filePath) throws IOException {
 
             String content = FileUtils.readFileToString(filePath.toFile(), Charset.defaultCharset());
             Matcher matcher = this.pattern.matcher(content);
-            String newContent = content;
+
+            int changes = 0;
             while (matcher.find()) {
+                changes++;
                 String fileName = matcher.group(1);
 
                 String version = this.jsVersionCache.get(fileName);
@@ -89,10 +85,13 @@ public class WebFilesProcessor {
                     this.jsVersionCache.put(fileName, version);
                 }
 
-                newContent = StringUtils.replace(newContent, fileName, fileName + "?n=" + version + "");
+                content = StringUtils.replace(content, String.format("\"%s\"", fileName), String.format("\"%s?n=%s\"", fileName, version));
             }
 
-            return newContent;
+            if (changes > 0) {
+                return Optional.ofNullable(content);
+            }
+            return Optional.empty();
         }
 
         private class JsFile {
@@ -104,23 +103,18 @@ public class WebFilesProcessor {
             }
 
             String getVersion() {
-                IOFileFilter nameFileFilter = FileFilterUtils.nameFileFilter(this.fileName);
-                Collection files = FileUtils.listFiles(WebFilesProcessor.this.webFilesDirectory, nameFileFilter, TrueFileFilter.INSTANCE);
-                return this.getVersion(files, this.fileName);
+                Path jsFilePath = WebFilesProcessor.this.webFilesDirectory.resolve(fileName);
+                return resolveFileChecksum(jsFilePath.toFile());
             }
 
-            private String getVersion(Collection<File> files, String fileName) {
-                if (files.isEmpty()) {
+            private String resolveFileChecksum(File file) {
+                try {
+                    String checksum = String.valueOf(FileUtils.checksumCRC32(file));
+                    WebFilesProcessor.this.log.info("JS : " + file.toString() + ", CHECKSUM: " + checksum);
+                    return checksum;
+                } catch (IOException e) {
+                    WebFilesProcessor.this.log.debug("Failed to generate checksum for file: " + file.getAbsolutePath(), e);
                     return getRandomVersion(fileName);
-                } else {
-                    File file = files.iterator().next();
-                    try {
-                        String checksum = String.valueOf(FileUtils.checksumCRC32(file));
-                        WebFilesProcessor.this.log.info("JS : " + file.toString() + ", CHECKSUM: " + checksum);
-                        return checksum;
-                    } catch (IOException var5) {
-                        return this.getRandomVersion(fileName);
-                    }
                 }
             }
 
@@ -130,40 +124,35 @@ public class WebFilesProcessor {
                 return randomString;
             }
 
-            @Override
-            public boolean equals(Object obj) {
-                if (obj instanceof EqualsBuilder) {
-                    JsFile jsFile = (JsFile) obj;
-                    EqualsBuilder equals = new EqualsBuilder();
-                    equals.append(jsFile.fileName, this.fileName);
-                    return equals.isEquals();
-                }
-                return false;
-            }
-
-            @Override
-            public int hashCode() {
-                HashCodeBuilder hash = new HashCodeBuilder();
-                hash.append(this.fileName);
-                return hash.toHashCode();
-            }
-
         }
     }
 
     private class WebFileWriter {
 
+        void write(Path filePath,
+                   String content) {
+            try {
+                Path relativeFilePath = WebFilesProcessor.this.webFilesDirectory.getParent().relativize(filePath);
+                Path destinationFilePath = WebFilesProcessor.this.webAppOutputDirectory.resolve(relativeFilePath);
+                Files.createDirectories(destinationFilePath.getParent());
+                Files.write(destinationFilePath, content.getBytes());
+            } catch (Exception e) {
+                throw new IllegalStateException("Couldn't write modified web file: ", e);
+            }
+        }
         
     }
 
     private class WebFilesVisitor extends SimpleFileVisitor<Path> {
 
         private ScriptTagProcessor scriptTagProcessor = new ScriptTagProcessor();
+        private WebFileWriter webFileWriter = new WebFileWriter();
 
         @Override
-        public FileVisitResult visitFile(Path filePath, BasicFileAttributes attrs) throws IOException {
-            String content = this.scriptTagProcessor.process(filePath);
-
+        public FileVisitResult visitFile(Path filePath,
+                                         BasicFileAttributes attrs) throws IOException {
+            this.scriptTagProcessor.process(filePath)
+                    .ifPresent(content -> this.webFileWriter.write(filePath, content));
             return FileVisitResult.CONTINUE;
         }
 
