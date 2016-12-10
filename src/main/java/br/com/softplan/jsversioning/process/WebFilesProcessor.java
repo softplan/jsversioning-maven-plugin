@@ -151,8 +151,14 @@ public class WebFilesProcessor {
         @Override
         public FileVisitResult visitFile(Path filePath,
                                          BasicFileAttributes attrs) throws IOException {
-            this.scriptTagProcessor.process(filePath)
-                    .ifPresent(content -> this.webFileWriter.write(filePath, content));
+            String contentType = Files.probeContentType(filePath);
+            if (!contentType.contains("image")) {
+                log.debug("Checking file: " + filePath);
+                this.scriptTagProcessor.process(filePath)
+                        .ifPresent(content -> this.webFileWriter.write(filePath, content));
+            } else {
+                log.debug("File is an image or video: " + filePath);
+            }
             return FileVisitResult.CONTINUE;
         }
 
