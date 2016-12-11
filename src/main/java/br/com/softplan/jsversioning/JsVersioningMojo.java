@@ -38,8 +38,10 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.stream.Stream;
 
-@Mojo(name = "versioning", defaultPhase = LifecyclePhase.PROCESS_RESOURCES)
+@Mojo(name = JsVersioningMojo.JS_VERSIONING_MOJO, defaultPhase = LifecyclePhase.PROCESS_RESOURCES)
 public class JsVersioningMojo extends AbstractMojo {
+
+    public static final String JS_VERSIONING_MOJO = "js-versioning";
 
     @Parameter(defaultValue = "${basedir}/src/main/webapp", required = true)
     private File webFilesDirectory;

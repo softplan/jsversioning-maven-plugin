@@ -132,7 +132,7 @@ public class WebFilesProcessor {
         void write(Path filePath,
                    String content) {
             try {
-                Path relativeFilePath = WebFilesProcessor.this.webFilesDirectory.getParent().relativize(filePath);
+                Path relativeFilePath = WebFilesProcessor.this.webFilesDirectory.relativize(filePath);
                 Path destinationFilePath = WebFilesProcessor.this.webAppOutputDirectory.resolve(relativeFilePath);
                 Files.createDirectories(destinationFilePath.getParent());
                 Files.write(destinationFilePath, content.getBytes());
