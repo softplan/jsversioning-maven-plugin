@@ -31,12 +31,9 @@ import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
-import org.codehaus.plexus.util.DirectoryScanner;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.Properties;
-import java.util.stream.Stream;
 
 @Mojo(name = JsVersioningMojo.JS_VERSIONING_MOJO, defaultPhase = LifecyclePhase.PROCESS_RESOURCES)
 public class JsVersioningMojo extends AbstractMojo {
@@ -55,6 +52,7 @@ public class JsVersioningMojo extends AbstractMojo {
     @Component
     private MavenProject mavenProject;
 
+    @Override
     public void execute() throws MojoFailureException {
         if (!this.webappOutputDirectory.exists()) {
             this.webappOutputDirectory.mkdirs();
@@ -68,6 +66,9 @@ public class JsVersioningMojo extends AbstractMojo {
     }
 
     private void validateParameters() {
+        if (this.webFilesDirectory == null || this.webappOutputDirectory == null) {
+            throw new IllegalArgumentException("Invalid configuration of webFilesDirectory or WebAppOutputDirectory. One or both are set to null.");
+        }
     }
 
     private boolean skipJsVersioning() {

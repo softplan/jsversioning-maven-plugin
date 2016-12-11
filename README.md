@@ -2,15 +2,17 @@
 
 #JAVASCRIPT VERSIONING
 
-You have something like this defined in your webapps files:
+This plugins searches scripts tags inside web files, html, jsp's and actually any files inside the web app directory with the exception of images.
+
+This plugin will change
 
 		<script language="javascript" type="text/JavaScript" src="script.js"></script>
-
-This plugin will change to:
+    
+to
 
 		<script language="javascript" type="text/JavaScript" src="script.js?n=version"></script>
 
-The version will be user defined, and if its not defined the plugin will generate a random UUID.
+The version value will be the checksum value of the script file, if this can be found inside the project, in this example script.js checksum. This allows that file that don't any changes keep the same name and maintain cache. If the file is not found inside the project, this plugin will generate a random value and use as version.
 
 ###USAGE
 
@@ -27,7 +29,7 @@ You have to define the execution like the example below, the default phase of th
 					<execution>
 						<id>jsVersioning</id>
 						<goals>
-							<goal>versioning</goal>
+							<goal>js-versioning</goal>
 						</goals>
 					</execution>
 				</executions>
@@ -36,15 +38,28 @@ You have to define the execution like the example below, the default phase of th
 		</plugins>
 	</build>
 
-By default the plugin will copy the output of the execution to ${project.build.directory}/temp
+By default the plugin will send the output to ${project.build.directory}/temp. You can use the war plugin to then copy the output to the generated war.
+
+example WAR plugin configuration:
+        
+    <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-war-plugin</artifactId>
+        <version>3.0.0</version>
+        <configuration>
+            <webResources>
+                <resource>
+                    <directory>${project.build.directory}/temp</directory>
+                </resource>
+            </webResources>
+        </configuration>
+    </plugin>
 
 ###PARAMETERS
 
 **webFilesDirectory** (*Default value = ${basedir}/src/main/webapp*): Where the plugin will look for the script tags.
 
 **webappOutputDirectory** (*Default value = ${project.build.directory}/temp*): The output folder of the execution.
-
-**version**: If the user wants to use a specific version on the scripts.
 
 ###MAVEN-CENTRAL
 

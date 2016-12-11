@@ -34,8 +34,6 @@ public class JsVersioningStub {
                 .forProject(basedir)
                 .execute("clean", "package");
         result.assertErrorFreeLog();
-
-
     }
 
 }
