@@ -4,4 +4,11 @@ jdk:
   - oraclejdk8
 
 script:
-  mvn verify
+  mvn test
+
+after_success:
+  mvn sonar:sonar \
+      -Dsonar.host.url=https://sonarqube.com \
+      -Dsonar.login=673e9723264d90fe8363d7ae0ced1e43e21546b3
+
+
