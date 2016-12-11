@@ -54,10 +54,10 @@ public class JsVersioningMojo extends AbstractMojo {
 
     @Override
     public void execute() throws MojoFailureException {
+        validateParameters();
         if (!this.webappOutputDirectory.exists()) {
             this.webappOutputDirectory.mkdirs();
         }
-        validateParameters();
         if (this.skipJsVersioning()) {
             getLog().info("Js versioning skipped");
         } else {
