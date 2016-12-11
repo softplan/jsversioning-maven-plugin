@@ -12,7 +12,9 @@ to
 
 		<script language="javascript" type="text/JavaScript" src="script.js?n=version"></script>
 
-The version value will be the checksum value of the script file, if this can be found inside the project, in this example script.js checksum. This allows that file that don't any changes keep the same name and maintain cache. If the file is not found inside the project, this plugin will generate a random value and use as version.
+The version value will be the checksum of the javascript file, if it can be found inside the project. In this example script.js checksum. 
+So files that don't have any changes keep the same name and version, maintaining cache.
+If the file is not found inside the web apps directory, this plugin will generate a random value and use it as version.
 
 ###USAGE
 
@@ -40,7 +42,7 @@ You have to define the execution like the example below, the default phase of th
 
 By default the plugin will send the output to ${project.build.directory}/temp. You can use the war plugin to then copy the output to the generated war.
 
-example WAR plugin configuration:
+WAR plugin configuration to demonstrate:
         
     <plugin>
         <groupId>org.apache.maven.plugins</groupId>
